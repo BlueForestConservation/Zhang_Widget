@@ -29,7 +29,7 @@ def run_zhang_app():
 
     # --- Widgets ---
     precip_widget = widgets.FloatSlider(
-        value=1000.0,
+        value=1962, #~ PRISM normal for North Yuba Watershed
         min=100.0,
         max=3000.0,
         step=10.0,
