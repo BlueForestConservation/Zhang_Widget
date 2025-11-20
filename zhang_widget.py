@@ -72,19 +72,24 @@ def run_zhang_app():
     plot_output = widgets.Output()
 
     # --- Helper: configure precip slider when units change ---
-    def configure_precip_slider(new_units, keep_current_value=True):
+    def configure_precip_slider(new_units, old_units, keep_current_value=True):
         """
         Adjust precip slider min/max/step/description when units change.
-        Internally we treat 100–3000 mm as the 'true' range.
+
+        We always treat 100–3000 mm as the "true" P range internally.
+
+        old_units: "si" or "us" – how to interpret the *current* slider value
+        new_units: "si" or "us" – how we want to display it next
         """
-        # First, get the current value in mm so we can preserve it
         current_val = precip_widget.value
-        # Interpret current_val according to current units_widget.value
-        if units_widget.value == "si":
+
+        # 1. Convert current slider value to mm using the *old* units
+        if old_units == "si":
             current_mm = current_val
-        else:
+        else:  # old_units == "us"
             current_mm = current_val * MM_PER_FT
 
+        # 2. Set up slider display for the *new* units
         if new_units == "si":
             precip_widget.min = 100.0
             precip_widget.max = 3000.0
@@ -96,8 +101,7 @@ def run_zhang_app():
                 )
             else:
                 precip_widget.value = 1000.0
-        else:
-            # US units (ft/yr)
+        else:  # new_units == "us"
             precip_widget.min = 100.0 / MM_PER_FT
             precip_widget.max = 3000.0 / MM_PER_FT
             precip_widget.step = 0.1
@@ -230,12 +234,13 @@ def run_zhang_app():
 
             plt.show()
 
-    # --- Respond to unit changes ---
     def on_units_change(change):
         if change["name"] == "value":
+            old_units = change["old"]
             new_units = change["new"]
-            configure_precip_slider(new_units, keep_current_value=True)
+            configure_precip_slider(new_units, old_units, keep_current_value=True)
             update_calculation()
+
 
     units_widget.observe(on_units_change, names="value")
 
@@ -244,7 +249,8 @@ def run_zhang_app():
         w.observe(update_calculation, names="value")
 
     # Initial configuration & draw
-    configure_precip_slider(units_widget.value, keep_current_value=False)
+    configure_precip_slider(units_widget.value, "si", keep_current_value=False)
+
     update_calculation()
 
     controls = VBox(
