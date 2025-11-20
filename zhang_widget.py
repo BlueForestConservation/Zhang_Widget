@@ -23,26 +23,27 @@ def zhang_et(mean_annual_precip, fraction_forest_cover):
     return (lht + rht) * mean_annual_precip
 
 
+
 def run_zhang_app():
     """
     Build and display the Zhang ET interactive widget.
-    Returns the top-level widget container (Jupyter will display it).
+    Precipitation input is always in mm/yr; outputs can be in mm/yr or ft/yr.
     """
 
-    # --- Units toggle ---
+    # --- Units toggle (for OUTPUTS only) ---
     units_widget = widgets.ToggleButtons(
         options=[("SI (mm/yr)", "si"), ("US (ft/yr)", "us")],
         value="si",
-        description="Units:",
+        description="Output units:",
     )
 
-    # --- Precip slider (we'll reconfigure it depending on units) ---
+    # --- Precip slider (always mm/yr) ---
     precip_widget = widgets.FloatSlider(
-        value=1962.0, # Yuba II value
+        value=1962.0,  # Yuba II value in mm
         min=100.0,
         max=3000.0,
         step=10.0,
-        description="P (mm/yr):",
+        description="P (mm/yr):",   # fixed in mm
         continuous_update=False,
         readout_format=".1f",
     )
@@ -71,60 +72,13 @@ def run_zhang_app():
     table_output = widgets.Output()
     plot_output = widgets.Output()
 
-    # --- Helper: configure precip slider when units change ---
-    def configure_precip_slider(new_units, old_units, keep_current_value=True):
-        """
-        Adjust precip slider min/max/step/description when units change.
-
-        We always treat 100–3000 mm as the "true" P range internally.
-
-        old_units: "si" or "us" – how to interpret the *current* slider value
-        new_units: "si" or "us" – how we want to display it next
-        """
-        current_val = precip_widget.value
-
-        # 1. Convert current slider value to mm using the *old* units
-        if old_units == "si":
-            current_mm = current_val
-        else:  # old_units == "us"
-            current_mm = current_val * MM_PER_FT
-
-        # 2. Set up slider display for the *new* units
-        if new_units == "si":
-            precip_widget.min = 100.0
-            precip_widget.max = 3000.0
-            precip_widget.step = 10.0
-            precip_widget.description = "P (mm/yr):"
-            if keep_current_value:
-                precip_widget.value = max(
-                    precip_widget.min, min(precip_widget.max, current_mm)
-                )
-            else:
-                precip_widget.value = 1000.0
-        else:  # new_units == "us"
-            precip_widget.min = 100.0 / MM_PER_FT
-            precip_widget.max = 3000.0 / MM_PER_FT
-            precip_widget.step = 0.1
-            precip_widget.description = "P (ft/yr):"
-            if keep_current_value:
-                current_ft = current_mm / MM_PER_FT
-                precip_widget.value = max(
-                    precip_widget.min, min(precip_widget.max, current_ft)
-                )
-            else:
-                precip_widget.value = 1000.0 / MM_PER_FT
-
     # --- Main update function ---
     def update_calculation(*args):
         units = units_widget.value  # "si" or "us"
         unit_label = "mm/yr" if units == "si" else "ft/yr"
 
-        # Convert precip slider to mm for the model
-        if units == "si":
-            P_mm = precip_widget.value
-        else:
-            P_mm = precip_widget.value * MM_PER_FT
-
+        # Model always runs in mm
+        P_mm = precip_widget.value
         f_before = forest_before_widget.value
         f_after = forest_after_widget.value
 
@@ -234,23 +188,12 @@ def run_zhang_app():
 
             plt.show()
 
-    def on_units_change(change):
-        if change["name"] == "value":
-            old_units = change["old"]
-            new_units = change["new"]
-            configure_precip_slider(new_units, old_units, keep_current_value=True)
-            update_calculation()
-
-
-    units_widget.observe(on_units_change, names="value")
-
-    # Attach callbacks for sliders
+    # --- Wire callbacks ---
+    units_widget.observe(update_calculation, names="value")
     for w in [precip_widget, forest_before_widget, forest_after_widget]:
         w.observe(update_calculation, names="value")
 
-    # Initial configuration & draw
-    configure_precip_slider(units_widget.value, "si", keep_current_value=False)
-
+    # Initial draw
     update_calculation()
 
     controls = VBox(
